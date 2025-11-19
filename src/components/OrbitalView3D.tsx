@@ -21,6 +21,10 @@ interface Debris {
 
 const OrbitalView3D = () => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [selectedObject, setSelectedObject] = useState<{type: 'satellite' | 'debris', data: Satellite | Debris} | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const [showSatellites, setShowSatellites] = useState(true);
+  const [showDebris, setShowDebris] = useState(true);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
