@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle, Info } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertCircle, CheckCircle, Info, X } from "lucide-react";
 
 interface Alert {
   id: string;
@@ -9,7 +12,7 @@ interface Alert {
   timestamp: string;
 }
 
-const alerts: Alert[] = [
+const initialAlerts: Alert[] = [
   {
     id: "A-001",
     type: "critical",
