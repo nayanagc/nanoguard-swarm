@@ -1,11 +1,21 @@
 import OrbitalView from "@/components/OrbitalView";
+import OrbitalView3D from "@/components/OrbitalView3D";
 import SatelliteStatus from "@/components/SatelliteStatus";
 import DebrisTracking from "@/components/DebrisTracking";
+import DebrisAnalysisPanel from "@/components/DebrisAnalysisPanel";
 import SystemMetrics from "@/components/SystemMetrics";
 import AlertFeed from "@/components/AlertFeed";
 import { Satellite } from "lucide-react";
+import { useRealtimeData } from "@/hooks/useRealtimeData";
+import { useEffect } from "react";
 
 const Index = () => {
+  const { metrics, alerts } = useRealtimeData(3000);
+
+  useEffect(() => {
+    console.log("Real-time metrics updated:", metrics);
+  }, [metrics]);
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
@@ -55,13 +65,14 @@ const Index = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Main View */}
           <div className="lg:col-span-2 space-y-6">
-            <OrbitalView />
+            <OrbitalView3D />
             <DebrisTracking />
           </div>
 
           {/* Right Column - Stats & Alerts */}
           <div className="space-y-6">
             <SystemMetrics />
+            <DebrisAnalysisPanel />
             <SatelliteStatus />
             <AlertFeed />
           </div>
