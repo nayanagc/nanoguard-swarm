@@ -3,13 +3,21 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertCircle, CheckCircle, Info, X } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { AlertCircle, CheckCircle, Info, X, Check } from "lucide-react";
 
 interface Alert {
   id: string;
   type: "critical" | "warning" | "info";
   message: string;
   timestamp: string;
+  acknowledged?: boolean;
+  acknowledgedAt?: string;
+  acknowledgedBy?: string;
+  notes?: string;
 }
 
 const initialAlerts: Alert[] = [
@@ -42,6 +50,10 @@ const initialAlerts: Alert[] = [
 const AlertFeed = () => {
   const [alerts, setAlerts] = useState<Alert[]>(initialAlerts);
   const [filterType, setFilterType] = useState<string>("all");
+  const [acknowledgeDialog, setAcknowledgeDialog] = useState(false);
+  const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
+  const [acknowledgeNotes, setAcknowledgeNotes] = useState("");
+  const [userName, setUserName] = useState("Operator-01");
 
   const filteredAlerts = filterType === "all" 
     ? alerts 
@@ -53,6 +65,35 @@ const AlertFeed = () => {
 
   const clearAllAlerts = () => {
     setAlerts([]);
+  };
+
+  const openAcknowledgeDialog = (alert: Alert) => {
+    setSelectedAlert(alert);
+    setAcknowledgeNotes(alert.notes || "");
+    setAcknowledgeDialog(true);
+  };
+
+  const acknowledgeAlert = () => {
+    if (!selectedAlert) return;
+    
+    const now = new Date();
+    const timestamp = now.toLocaleTimeString('en-US', { hour12: false });
+    
+    setAlerts(alerts.map(alert => 
+      alert.id === selectedAlert.id 
+        ? { 
+            ...alert, 
+            acknowledged: true, 
+            acknowledgedAt: timestamp,
+            acknowledgedBy: userName,
+            notes: acknowledgeNotes 
+          }
+        : alert
+    ));
+    
+    setAcknowledgeDialog(false);
+    setSelectedAlert(null);
+    setAcknowledgeNotes("");
   };
 
   const getAlertIcon = (type: string) => {
@@ -140,20 +181,111 @@ const AlertFeed = () => {
                     </span>
                   </div>
                   <p className="text-sm text-foreground">{alert.message}</p>
+                  {alert.acknowledged && (
+                    <div className="mt-2 pt-2 border-t border-border/30">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Check className="w-3 h-3 text-success" />
+                        <span>Acknowledged by {alert.acknowledgedBy} at {alert.acknowledgedAt}</span>
+                      </div>
+                      {alert.notes && (
+                        <p className="text-xs text-muted-foreground mt-1 italic">"{alert.notes}"</p>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => dismissAlert(alert.id)}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
+                <div className="flex flex-col gap-1">
+                  {!alert.acknowledged && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openAcknowledgeDialog(alert)}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity h-6 px-2 text-xs"
+                    >
+                      <Check className="h-3 w-3 mr-1" />
+                      Ack
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => dismissAlert(alert.id)}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           ))
         )}
       </div>
+
+      <Dialog open={acknowledgeDialog} onOpenChange={setAcknowledgeDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Acknowledge Alert</DialogTitle>
+            <DialogDescription>
+              Mark this alert as reviewed and add your notes.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedAlert && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Alert Details</Label>
+                <div className="p-3 bg-secondary/50 rounded-lg border border-border/50">
+                  <div className="flex items-center gap-2 mb-2">
+                    {getAlertBadge(selectedAlert.type)}
+                    <span className="text-xs font-mono text-muted-foreground">
+                      {selectedAlert.timestamp}
+                    </span>
+                  </div>
+                  <p className="text-sm">{selectedAlert.message}</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="userName" className="text-sm font-medium">
+                  Your Name
+                </Label>
+                <Input
+                  id="userName"
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                  placeholder="Enter your name"
+                  className="text-sm"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="notes" className="text-sm font-medium">
+                  Notes (Optional)
+                </Label>
+                <Textarea
+                  id="notes"
+                  value={acknowledgeNotes}
+                  onChange={(e) => setAcknowledgeNotes(e.target.value)}
+                  placeholder="Add any notes about how this alert was handled..."
+                  className="min-h-[100px] text-sm"
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAcknowledgeDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={acknowledgeAlert}>
+              <Check className="w-4 h-4 mr-2" />
+              Acknowledge Alert
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };

@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import * as THREE from "three";
+import { Play, Pause, Eye, EyeOff, RotateCcw, Orbit, Activity } from "lucide-react";
 
 interface Satellite {
   id: string;
@@ -25,11 +29,14 @@ const OrbitalView3D = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [showSatellites, setShowSatellites] = useState(true);
   const [showDebris, setShowDebris] = useState(true);
+  const [showOrbits, setShowOrbits] = useState(true);
+  const [viewMode, setViewMode] = useState<"auto" | "free">("auto");
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const satellitesRef = useRef<{ mesh: THREE.Mesh; data: Satellite }[]>([]);
   const debrisRef = useRef<{ mesh: THREE.Mesh; data: Debris }[]>([]);
+  const orbitRingsRef = useRef<THREE.Line[]>([]);
   const [autoRotate, setAutoRotate] = useState(true);
 
   useEffect(() => {
@@ -110,9 +117,13 @@ const OrbitalView3D = () => {
       return new THREE.Line(geometry, material);
     };
 
-    scene.add(createOrbitRing(8, 0x5bb9ff));
-    scene.add(createOrbitRing(10, 0x5bb9ff));
-    scene.add(createOrbitRing(12, 0x5bb9ff));
+    const ring1 = createOrbitRing(8, 0x5bb9ff);
+    const ring2 = createOrbitRing(10, 0x5bb9ff);
+    const ring3 = createOrbitRing(12, 0x5bb9ff);
+    scene.add(ring1);
+    scene.add(ring2);
+    scene.add(ring3);
+    orbitRingsRef.current = [ring1, ring2, ring3];
 
     // Create satellites
     const satellites: Satellite[] = [
@@ -196,6 +207,7 @@ const OrbitalView3D = () => {
     const onMouseDown = (e: MouseEvent) => {
       isDragging = true;
       setAutoRotate(false);
+      setViewMode("free");
     };
 
     const onMouseMove = (e: MouseEvent) => {
@@ -251,34 +263,47 @@ const OrbitalView3D = () => {
       animationId = requestAnimationFrame(animate);
 
       // Rotate Earth
-      earth.rotation.y += 0.001;
-      glow.rotation.y += 0.001;
+      if (!isPaused) {
+        earth.rotation.y += 0.001;
+        glow.rotation.y += 0.001;
+      }
 
       // Auto-rotate camera
-      if (autoRotate) {
+      if (autoRotate && viewMode === "auto") {
         autoRotateAngle += 0.002;
         camera.position.x = Math.cos(autoRotateAngle) * 20;
         camera.position.z = Math.sin(autoRotateAngle) * 20;
         camera.lookAt(0, 0, 0);
       }
 
+      // Update orbit visibility
+      orbitRingsRef.current.forEach(ring => {
+        ring.visible = showOrbits;
+      });
+
       // Update satellites
       satellitesRef.current.forEach(({ mesh, data }) => {
-        data.angle += data.speed;
-        const x = Math.cos(data.angle) * data.radius;
-        const z = Math.sin(data.angle) * data.radius;
-        mesh.position.set(x, 0, z);
-        mesh.rotation.y += 0.02;
+        mesh.visible = showSatellites;
+        if (!isPaused) {
+          data.angle += data.speed;
+          const x = Math.cos(data.angle) * data.radius;
+          const z = Math.sin(data.angle) * data.radius;
+          mesh.position.set(x, 0, z);
+          mesh.rotation.y += 0.02;
+        }
       });
 
       // Update debris
       debrisRef.current.forEach(({ mesh, data }) => {
-        data.angle += data.speed;
-        const x = Math.cos(data.angle) * data.radius;
-        const z = Math.sin(data.angle) * data.radius;
-        mesh.position.set(x, 0, z);
-        mesh.rotation.x += 0.01;
-        mesh.rotation.y += 0.01;
+        mesh.visible = showDebris;
+        if (!isPaused) {
+          data.angle += data.speed;
+          const x = Math.cos(data.angle) * data.radius;
+          const z = Math.sin(data.angle) * data.radius;
+          mesh.position.set(x, 0, z);
+          mesh.rotation.x += 0.01;
+          mesh.rotation.y += 0.01;
+        }
       });
 
       renderer.render(scene, camera);
@@ -309,17 +334,99 @@ const OrbitalView3D = () => {
       renderer.dispose();
       containerRef.current?.removeChild(renderer.domElement);
     };
-  }, [autoRotate]);
+  }, [autoRotate, isPaused, showSatellites, showDebris, showOrbits, viewMode]);
+
+  const resetView = () => {
+    if (cameraRef.current) {
+      cameraRef.current.position.set(15, 15, 15);
+      cameraRef.current.lookAt(0, 0, 0);
+      setAutoRotate(true);
+      setViewMode("auto");
+    }
+  };
+
+  const togglePause = () => {
+    setIsPaused(!isPaused);
+  };
 
   return (
     <Card className="relative overflow-hidden bg-card border-border h-[500px]">
       <div ref={containerRef} className="w-full h-full" />
+      
       <div className="absolute top-4 left-4 text-xs font-mono text-muted-foreground">
         3D ORBITAL VIEW
       </div>
-      <div className="absolute top-4 right-4 text-xs font-mono text-muted-foreground">
-        Drag to rotate • Scroll to zoom
+
+      <div className="absolute top-4 right-4 space-y-2">
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={togglePause}
+            title={isPaused ? "Resume animation" : "Pause animation"}
+            className="h-8 w-8 p-0"
+          >
+            {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={resetView}
+            title="Reset view"
+            className="h-8 w-8 p-0"
+          >
+            <RotateCcw className="w-4 h-4" />
+          </Button>
+          <Button
+            variant={viewMode === "auto" ? "default" : "outline"}
+            size="sm"
+            onClick={() => {
+              setViewMode("auto");
+              setAutoRotate(true);
+            }}
+            title="Auto-rotate camera"
+            className="h-8 px-3 text-xs"
+          >
+            <Orbit className="w-4 h-4 mr-1" />
+            Auto
+          </Button>
+        </div>
+
+        <div className="flex flex-col gap-2 bg-card/80 backdrop-blur-sm p-2 rounded-lg border border-border">
+          <Button
+            variant={showSatellites ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowSatellites(!showSatellites)}
+            className="justify-start h-7 text-xs"
+          >
+            {showSatellites ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+            <span className="ml-2">Satellites</span>
+          </Button>
+          <Button
+            variant={showDebris ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowDebris(!showDebris)}
+            className="justify-start h-7 text-xs"
+          >
+            {showDebris ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+            <span className="ml-2">Debris</span>
+          </Button>
+          <Button
+            variant={showOrbits ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowOrbits(!showOrbits)}
+            className="justify-start h-7 text-xs"
+          >
+            {showOrbits ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+            <span className="ml-2">Orbits</span>
+          </Button>
+        </div>
       </div>
+
+      <div className="absolute bottom-4 left-4 text-xs font-mono text-muted-foreground">
+        {isPaused ? "⏸ PAUSED" : "▶ LIVE"} • {viewMode === "auto" ? "Auto Rotate" : "Manual Control"}
+      </div>
+
       <div className="absolute bottom-4 right-4 flex gap-4 text-xs font-mono">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-primary shadow-glow" />
@@ -334,6 +441,95 @@ const OrbitalView3D = () => {
           <span className="text-muted-foreground">High Threat</span>
         </div>
       </div>
+
+      <Dialog open={!!selectedObject} onOpenChange={() => setSelectedObject(null)}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {selectedObject?.type === 'satellite' ? (
+                <>
+                  <Activity className="w-5 h-5 text-success" />
+                  Satellite Details
+                </>
+              ) : (
+                <>
+                  <Activity className="w-5 h-5 text-destructive" />
+                  Debris Details
+                </>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              Real-time orbital information and status
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedObject && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Object ID</p>
+                  <p className="font-mono text-sm">{selectedObject.data.id}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Type</p>
+                  <Badge variant={selectedObject.type === 'satellite' ? 'default' : 'destructive'}>
+                    {selectedObject.type === 'satellite' ? 'NanoSwarm' : 'Debris'}
+                  </Badge>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Orbital Radius</p>
+                  <p className="text-sm font-mono">{selectedObject.data.radius.toFixed(2)} km</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Orbital Speed</p>
+                  <p className="text-sm font-mono">{(selectedObject.data.speed * 1000).toFixed(3)} rad/s</p>
+                </div>
+                {selectedObject.type === 'satellite' && (
+                  <div className="space-y-1 col-span-2">
+                    <p className="text-xs text-muted-foreground">Status</p>
+                    <Badge variant="outline" className="text-success">
+                      {(selectedObject.data as Satellite).status.toUpperCase()}
+                    </Badge>
+                  </div>
+                )}
+                {selectedObject.type === 'debris' && (
+                  <>
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">Size</p>
+                      <p className="text-sm font-mono">{(selectedObject.data as Debris).size.toFixed(2)} m</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">Threat Level</p>
+                      <Badge variant={(selectedObject.data as Debris).threat === 'high' ? 'destructive' : 'outline'}>
+                        {(selectedObject.data as Debris).threat.toUpperCase()}
+                      </Badge>
+                    </div>
+                  </>
+                )}
+              </div>
+              
+              <div className="p-3 bg-secondary/30 rounded-lg border border-border/50">
+                <p className="text-xs text-muted-foreground mb-1">Current Angle</p>
+                <p className="font-mono text-sm">
+                  {(selectedObject.data.angle * (180 / Math.PI)).toFixed(2)}° ({selectedObject.data.angle.toFixed(4)} rad)
+                </p>
+              </div>
+
+              {selectedObject.type === 'satellite' && (
+                <div className="text-xs text-muted-foreground bg-success/10 p-3 rounded-lg border border-success/20">
+                  ✓ This satellite is actively monitoring and coordinating debris tracking operations within the autonomous swarm network.
+                </div>
+              )}
+              
+              {selectedObject.type === 'debris' && (selectedObject.data as Debris).threat === 'high' && (
+                <div className="text-xs text-destructive bg-destructive/10 p-3 rounded-lg border border-destructive/20">
+                  ⚠ High threat debris detected. Nudge maneuvers recommended for collision avoidance.
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };
