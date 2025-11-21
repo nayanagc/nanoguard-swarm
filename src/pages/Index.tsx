@@ -1,8 +1,9 @@
-import OrbitalView from "@/components/OrbitalView";
 import OrbitalView3D from "@/components/OrbitalView3D";
 import SatelliteStatus from "@/components/SatelliteStatus";
+import SatelliteTelemetry from "@/components/SatelliteTelemetry";
 import DebrisTracking from "@/components/DebrisTracking";
 import DebrisAnalysisPanel from "@/components/DebrisAnalysisPanel";
+import ManeuverPlanning from "@/components/ManeuverPlanning";
 import SystemMetrics from "@/components/SystemMetrics";
 import AlertFeed from "@/components/AlertFeed";
 import { Satellite } from "lucide-react";
@@ -63,29 +64,27 @@ const Index = () => {
       {/* Main Dashboard */}
       <main className="container mx-auto px-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Main View */}
+          {/* Left Column - 3D View & Telemetry */}
           <div className="lg:col-span-2 space-y-6">
             <OrbitalView3D />
+            <SatelliteTelemetry />
             <DebrisTracking />
           </div>
 
-          {/* Right Column - Stats & Alerts */}
+          {/* Right Column - Control & Analytics */}
           <div className="space-y-6">
             <SystemMetrics />
+            <AlertFeed />
+            <ManeuverPlanning />
             <DebrisAnalysisPanel />
             <SatelliteStatus />
-            <AlertFeed />
           </div>
         </div>
 
         {/* Info Banner */}
         <div className="mt-6 p-4 bg-gradient-orbital rounded-lg border border-primary/30">
           <p className="text-sm text-center text-muted-foreground">
-            Autonomous nano-satellite swarm utilizing AI computer vision and ML
-            prediction algorithms to detect, classify, and track space debris.
-            Coordinated micro-thruster maneuvers enable gentle orbital decay
-            nudging for micro-debris, while real-time alerts protect larger
-            spacecraft.
+            Comprehensive Mission Control: Click on satellites or debris in the 3D view to inspect details. Monitor real-time telemetry, plan autonomous maneuvers, and track AI-powered debris predictions across the autonomous nano-satellite swarm network.
           </p>
         </div>
       </main>
