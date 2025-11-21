@@ -38,9 +38,15 @@ const OrbitalView3D = () => {
   const debrisRef = useRef<{ mesh: THREE.Mesh; data: Debris }[]>([]);
   const orbitRingsRef = useRef<THREE.Line[]>([]);
   const [autoRotate, setAutoRotate] = useState(true);
+  const raycasterRef = useRef<THREE.Raycaster | null>(null);
+  const mouseRef = useRef<THREE.Vector2 | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
+
+    // Initialize raycaster and mouse vector
+    raycasterRef.current = new THREE.Raycaster();
+    mouseRef.current = new THREE.Vector2();
 
     // Scene setup
     const scene = new THREE.Scene();
@@ -250,10 +256,51 @@ const OrbitalView3D = () => {
       }
     };
 
+    const onClick = (e: MouseEvent) => {
+      if (!containerRef.current || !raycasterRef.current || !mouseRef.current) return;
+
+      // Calculate mouse position in normalized device coordinates
+      const rect = containerRef.current.getBoundingClientRect();
+      mouseRef.current.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouseRef.current.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+      // Update raycaster
+      raycasterRef.current.setFromCamera(mouseRef.current, camera);
+
+      // Check for intersections with satellites
+      const satelliteMeshes = satellitesRef.current.map(s => s.mesh);
+      const satelliteIntersects = raycasterRef.current.intersectObjects(satelliteMeshes, true);
+
+      if (satelliteIntersects.length > 0) {
+        const clickedMesh = satelliteIntersects[0].object;
+        const satellite = satellitesRef.current.find(s => 
+          s.mesh === clickedMesh || s.mesh.children.includes(clickedMesh)
+        );
+        if (satellite) {
+          setSelectedObject({ type: 'satellite', data: satellite.data });
+          return;
+        }
+      }
+
+      // Check for intersections with debris
+      const debrisMeshes = debrisRef.current.map(d => d.mesh);
+      const debrisIntersects = raycasterRef.current.intersectObjects(debrisMeshes);
+
+      if (debrisIntersects.length > 0) {
+        const clickedMesh = debrisIntersects[0].object;
+        const debris = debrisRef.current.find(d => d.mesh === clickedMesh);
+        if (debris) {
+          setSelectedObject({ type: 'debris', data: debris.data });
+          return;
+        }
+      }
+    };
+
     renderer.domElement.addEventListener("mousedown", onMouseDown);
     renderer.domElement.addEventListener("mousemove", onMouseMove);
     renderer.domElement.addEventListener("mouseup", onMouseUp);
     renderer.domElement.addEventListener("wheel", onWheel);
+    renderer.domElement.addEventListener("click", onClick);
 
     // Animation loop
     let animationId: number;
@@ -330,6 +377,7 @@ const OrbitalView3D = () => {
       renderer.domElement.removeEventListener("mousemove", onMouseMove);
       renderer.domElement.removeEventListener("mouseup", onMouseUp);
       renderer.domElement.removeEventListener("wheel", onWheel);
+      renderer.domElement.removeEventListener("click", onClick);
       cancelAnimationFrame(animationId);
       renderer.dispose();
       containerRef.current?.removeChild(renderer.domElement);
